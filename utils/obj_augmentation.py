@@ -23,6 +23,8 @@ Image Transformations :
     LogContrast
     GaussianBlur
 """
+import cv2
+import numpy as np
 from imgaug import augmenters as iaa
 
 
@@ -37,10 +39,8 @@ class ObjectAgumentator:
         self._aug_pipe = iaa.Sequential(
             [
                 iaa.Fliplr(0.5), # horizontally flip 50% of all images
-                iaa.
                 sometimes(iaa.Affine(
-                    scale={"x": (0.4, 2), "y": (0.4, 2)}, # scale images to 80-120% of their size, per axis
-                    rotate=(-20, 20), # rotate by -45 to +45 degrees
+                    rotate=(-20, 20),  # rotate by -45 to +45 degrees
                 )),
                 iaa.SomeOf((0, 5),
                            [
@@ -65,6 +65,8 @@ class ObjectAgumentator:
             random_order=True
         )
 
-    def transform(self, img):
-        pass
-
+    def __call__(self, img, *args, **kwargs):
+        scale = np.random.choice(self._img_allowed_scales)
+        print(scale)
+        img = cv2.resize(img, None, fx=scale, fy=scale)
+        return self._aug_pipe.augment_image(img)
