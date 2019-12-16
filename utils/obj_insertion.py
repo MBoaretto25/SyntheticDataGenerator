@@ -1,3 +1,4 @@
+
 import numpy as np
 from collections import namedtuple
 
@@ -11,6 +12,13 @@ class ObjectInsertion:
         self._Centroid = namedtuple('Centroid', 'x, y, w, h')
 
     def _iou(self, obj_a, obj_b):
+        """
+        Calculate Itersection Over Union between 2 boxes
+        """
+        # compute the area of both the prediction and ground-truth
+        # rectangles
+        box_a_area = (obj_a[2] - obj_a[0] + 1) * (obj_a[3] - obj_a[1] + 1)
+        box_b_area = (obj_b[2] - obj_b[0] + 1) * (obj_b[3] - obj_b[1] + 1)
 
         # determine the (x, y)-coordinates of the intersection rectangle
         x_a = max(obj_a[0], obj_b[0])
@@ -20,11 +28,6 @@ class ObjectInsertion:
 
         # compute the area of intersection rectangle
         inter_area = max(0, x_b - x_a + 1) * max(0, y_b - y_a + 1)
-
-        # compute the area of both the prediction and ground-truth
-        # rectangles
-        box_a_area = (obj_a[2] - obj_a[0] + 1) * (obj_a[3] - obj_a[1] + 1)
-        box_b_area = (obj_b[2] - obj_b[0] + 1) * (obj_b[3] - obj_b[1] + 1)
 
         # compute the intersection over union by taking the intersection
         # area and dividing it by the sum of prediction + ground-truth
@@ -36,11 +39,13 @@ class ObjectInsertion:
 
     @staticmethod
     def _get_random_point_within_boundaries(position_range, boundary):
-        print("position_range, boundary", position_range, boundary)
-        return np.random.randint(boundary, position_range - boundary)
+        try:
+            return np.random.randint(boundary, position_range - boundary)
+        except ValueError:
+            return boundary
 
     @staticmethod
-    def _xywd_2_xyxy(obj):
+    def xywd_2_xyxy(obj):
         x1 = obj.x - obj.w//2
         x2 = obj.x + obj.w//2
         y1 = obj.y - obj.h//2
@@ -60,13 +65,15 @@ class ObjectInsertion:
 
         while True:
             img_centroid = self._get_new_object_position(bgi.shape, img.shape)
-            img_coordinates = self._xywd_2_xyxy(img_centroid)
-            is_feasible = not any([self._iou(img_coordinates, self._xywd_2_xyxy(centroid)) > 0.4
-                                   for centroid in centroid_list])
+            img_coordinates = self.xywd_2_xyxy(img_centroid)
+            is_feasible = True
+            for centroid in centroid_list:
+                if self._iou(img_coordinates, self.xywd_2_xyxy(centroid)) >= 0.4:
+                    is_feasible = False
+                    break
+            # is_feasible = not any([self._iou(img_coordinates, self._xywd_2_xyxy(centroid)) > 0.4
+            #                        for centroid in centroid_list])
             if is_feasible:
                 break
-        print(img_coordinates[0], img_coordinates[0]+img.shape[0])
-        print(img_coordinates[1], img_coordinates[1]+img.shape[1])
-        print(img.shape)
         bgi[img_coordinates[1]:img_coordinates[1]+img.shape[0], img_coordinates[0]:img_coordinates[0]+img.shape[1], ...] = img
         return img_centroid, bgi
