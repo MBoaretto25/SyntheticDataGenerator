@@ -6,7 +6,6 @@ Object Transformations:
     Fliplr
     Rotations = (-20, 20)
 
-    PiecewiseAffine = scale(0.02, 0.075)
     PerspectiveTransform = scale(.025, 0.075)
     MaxPooling k = 2
     MotionBlur
@@ -32,32 +31,33 @@ class ObjectAgumentator:
 
     def __init__(self):
 
-        self._img_allowed_scales = [.5, .75, 1, 1.25, 1.5, 2, 2.25]
+        self._img_allowed_scales = [0.25, 0.5, .75, 1, 1.25, 1.5, 2]
 
         sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
-        self._aug_pipe = iaa.Sequential(
+        self._aug_pipe_object = iaa.Sequential(
             [
-                iaa.Fliplr(0.5), # horizontally flip 50% of all images
+                iaa.Fliplr(0.5),
                 sometimes(iaa.Affine(
-                    rotate=(-20, 20),  # rotate by -45 to +45 degrees
+                    rotate=(-20, 20),
                 )),
                 iaa.SomeOf((0, 5),
                            [
                                sometimes(iaa.Superpixels(p_replace=(0.20, 0.5), n_segments=(20, 100))),
                                iaa.OneOf([
-                                   iaa.GaussianBlur((0, 3.0)),  # blur images with a sigma between 0 and 3.0
-                                   iaa.AverageBlur(k=(2, 7)),  # blur image using local means (kernel sizes between 2 and 7)
-                                   iaa.MedianBlur(k=(3, 11)),  # blur image using local medians (kernel sizes between 2 and 7)
+                                   iaa.GaussianBlur((0, 3.0)),
+                                   iaa.AverageBlur(k=(2, 7)),
+                                   iaa.MedianBlur(k=(3, 11)),
                                ]),
-                               iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5),  # add gaussian noise
+                               sometimes(iaa.PerspectiveTransform(scale=(0.025, 0.075))),
+                               iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5),
                                iaa.OneOf([
-                                   iaa.Dropout((0.01, 0.1), per_channel=0.5),  # randomly remove up to 10% of the pixels
+                                   iaa.Dropout((0.01, 0.1), per_channel=0.5),
                                    iaa.CoarseDropout((0.03, 0.15), size_percent=(0.02, 0.05), per_channel=0.2),
                                ]),
-                               iaa.Add((-10, 10), per_channel=0.5),  # change brightness of images
-                               iaa.Multiply((0.5, 1.5), per_channel=0.5),  # change brightness of images
-                               iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5),  # improve or worsen the contrast
+                               iaa.Add((-10, 10), per_channel=0.5),
+                               iaa.Multiply((0.5, 1.5), per_channel=0.5),
+                               iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5),
                            ],
                            random_order=True
                            )
@@ -65,8 +65,31 @@ class ObjectAgumentator:
             random_order=True
         )
 
-    def __call__(self, img, *args, **kwargs):
+        self._aug_pipe_sample = iaa.Sequential(
+            [
+            iaa.SomeOf((0, 3),
+                       [
+                           sometimes(iaa.Superpixels(p_replace=(0.20, 0.5), n_segments=(20, 100))),
+                           iaa.OneOf([
+                               iaa.GaussianBlur((0, 3.0)),
+                               iaa.AverageBlur(k=(2, 7)),
+                               iaa.MedianBlur(k=(3, 11)),
+                           ]),
+                           iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5),
+
+                       ],
+                       random_order=True
+                       ),
+                iaa.Add((-25, 25), per_channel=0.5),
+                iaa.Multiply((0.5, 1.5), per_channel=0.5),
+                iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5),
+            ],
+            random_order=True
+        )
+
+    def __call__(self, img, sample=False, *args, **kwargs):
         scale = np.random.choice(self._img_allowed_scales)
-        print(scale)
         img = cv2.resize(img, None, fx=scale, fy=scale)
-        return self._aug_pipe.augment_image(img)
+        if sample:
+            return self._aug_pipe_sample.augment_image(img)
+        return self._aug_pipe_object.augment_image(img)
